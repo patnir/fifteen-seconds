@@ -5,31 +5,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export default function Home() {
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Load the audio file once on mount
+    audioRef.current = new Audio("/alrightchat.m4a");
+  }, []);
 
   const playBell = useCallback(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
+    const audio = audioRef.current;
+    if (audio) {
+      // Play only the last 2 seconds
+      const startTime = Math.max(0, audio.duration - 2);
+      audio.currentTime = startTime;
+      audio.play();
     }
-    const ctx = audioContextRef.current;
-
-    // Create a bell-like sound
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    oscillator.frequency.setValueAtTime(830, ctx.currentTime); // Bell frequency
-    oscillator.type = "sine";
-
-    // Bell envelope - quick attack, longer decay
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
-
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 1.5);
   }, []);
 
   useEffect(() => {
