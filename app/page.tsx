@@ -6,19 +6,25 @@ export default function Home() {
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioDurationRef = useRef<number>(0);
 
   useEffect(() => {
     // Load the audio file once on mount
-    audioRef.current = new Audio("/alrightchat.m4a");
+    const audio = new Audio("/alrightchat.m4a");
+    audio.preload = "auto";
+    audio.addEventListener("loadedmetadata", () => {
+      audioDurationRef.current = audio.duration;
+    });
+    audioRef.current = audio;
   }, []);
 
   const playBell = useCallback(() => {
     const audio = audioRef.current;
-    if (audio) {
+    if (audio && audioDurationRef.current > 0) {
       // Play only the last 2 seconds
-      const startTime = Math.max(0, audio.duration - 2);
+      const startTime = Math.max(0, audioDurationRef.current - 2);
       audio.currentTime = startTime;
-      audio.play();
+      audio.play().catch((e) => console.error("Audio play failed:", e));
     }
   }, []);
 
