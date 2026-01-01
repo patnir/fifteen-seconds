@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export default function Home() {
-  const [seconds, setSeconds] = useState(0);
+  const [duration, setDuration] = useState(15);
+  const [seconds, setSeconds] = useState(15);
   const [isRunning, setIsRunning] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState("15");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioDurationRef = useRef<number>(0);
+  const audioUnlockedRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Load the audio file once on mount
@@ -16,6 +20,22 @@ export default function Home() {
       audioDurationRef.current = audio.duration;
     });
     audioRef.current = audio;
+  }, []);
+
+  const unlockAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio && !audioUnlockedRef.current) {
+      // Play and immediately pause to unlock audio on mobile
+      audio.volume = 0;
+      audio.play().then(() => {
+        audio.pause();
+        audio.volume = 1;
+        audio.currentTime = 0;
+        audioUnlockedRef.current = true;
+      }).catch(() => {
+        // Ignore errors during unlock attempt
+      });
+    }
   }, []);
 
   const playBell = useCallback(() => {
@@ -34,11 +54,11 @@ export default function Home() {
     if (isRunning) {
       interval = setInterval(() => {
         setSeconds((prev) => {
-          if (prev >= 14) {
+          if (prev <= 1) {
             playBell();
-            return 0;
+            return duration;
           }
-          return prev + 1;
+          return prev - 1;
         });
       }, 1000);
     }
@@ -46,23 +66,73 @@ export default function Home() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning, playBell]);
+  }, [isRunning, playBell, duration]);
 
-  const handlePlay = () => setIsRunning(true);
+  const handlePlay = () => {
+    unlockAudio();
+    setIsRunning(true);
+  };
+
   const handlePause = () => setIsRunning(false);
+
   const handleReset = () => {
     setIsRunning(false);
-    setSeconds(0);
+    setSeconds(duration);
+  };
+
+  const handleNumberClick = () => {
+    if (!isRunning) {
+      setIsEditing(true);
+      setInputValue(seconds.toString());
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, "");
+    if (val.length <= 3) {
+      setInputValue(val);
+    }
+  };
+
+  const handleInputSubmit = () => {
+    const newDuration = Math.max(1, Math.min(999, parseInt(inputValue) || 15));
+    setDuration(newDuration);
+    setSeconds(newDuration);
+    setIsEditing(false);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleInputSubmit();
+    } else if (e.key === "Escape") {
+      setIsEditing(false);
+    }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-950 font-mono">
       <main className="flex flex-col items-center gap-12">
         {/* Timer display */}
-        <div className="relative">
-          <div className="text-[12rem] font-bold leading-none tracking-tighter text-amber-500 tabular-nums">
-            {seconds.toString().padStart(2, "0")}
-          </div>
+        <div className="relative h-[12rem]">
+          {isEditing ? (
+            <input
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleInputSubmit}
+              onKeyDown={handleInputKeyDown}
+              className="text-[12rem] font-bold leading-none tracking-tighter text-amber-500 tabular-nums bg-transparent text-center outline-none border-none h-[12rem]"
+              style={{ width: `${Math.max(2, inputValue.length)}ch` }}
+              autoFocus
+            />
+          ) : (
+            <div
+              onClick={handleNumberClick}
+              className={`text-[12rem] font-bold leading-none tracking-tighter text-amber-500 tabular-nums ${!isRunning ? "cursor-pointer hover:text-amber-400 transition-colors" : ""}`}
+            >
+              {seconds.toString().padStart(2, "0")}
+            </div>
+          )}
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-stone-500 text-sm uppercase tracking-widest">
             seconds
           </div>
@@ -72,7 +142,7 @@ export default function Home() {
         <div className="w-80 h-1 bg-stone-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-amber-500 transition-all duration-1000 ease-linear"
-            style={{ width: `${(seconds / 15) * 100}%` }}
+            style={{ width: `${((duration - seconds) / duration) * 100}%` }}
           />
         </div>
 
