@@ -1,63 +1,107 @@
-import Image from "next/image";
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export default function Home() {
+  const [seconds, setSeconds] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playBell = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    const ctx = audioContextRef.current;
+
+    // Create a bell-like sound
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.frequency.setValueAtTime(830, ctx.currentTime); // Bell frequency
+    oscillator.type = "sine";
+
+    // Bell envelope - quick attack, longer decay
+    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 1.5);
+  }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (isRunning) {
+      interval = setInterval(() => {
+        setSeconds((prev) => {
+          if (prev >= 14) {
+            playBell();
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning, playBell]);
+
+  const handlePlay = () => setIsRunning(true);
+  const handlePause = () => setIsRunning(false);
+  const handleReset = () => {
+    setIsRunning(false);
+    setSeconds(0);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex min-h-screen items-center justify-center bg-stone-950 font-mono">
+      <main className="flex flex-col items-center gap-12">
+        {/* Timer display */}
+        <div className="relative">
+          <div className="text-[12rem] font-bold leading-none tracking-tighter text-amber-500 tabular-nums">
+            {seconds.toString().padStart(2, "0")}
+          </div>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-stone-500 text-sm uppercase tracking-widest">
+            seconds
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* Progress bar */}
+        <div className="w-80 h-1 bg-stone-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-amber-500 transition-all duration-1000 ease-linear"
+            style={{ width: `${(seconds / 15) * 100}%` }}
+          />
+        </div>
+
+        {/* Controls */}
+        <div className="flex gap-4">
+          <button
+            onClick={handlePlay}
+            disabled={isRunning}
+            className="w-24 h-12 rounded bg-amber-500 text-stone-950 font-semibold uppercase tracking-wider text-sm transition-all hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Play
+          </button>
+          <button
+            onClick={handlePause}
+            disabled={!isRunning}
+            className="w-24 h-12 rounded border border-stone-600 text-stone-400 font-semibold uppercase tracking-wider text-sm transition-all hover:border-stone-400 hover:text-stone-200 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            Documentation
-          </a>
+            Pause
+          </button>
+          <button
+            onClick={handleReset}
+            className="w-24 h-12 rounded border border-stone-600 text-stone-400 font-semibold uppercase tracking-wider text-sm transition-all hover:border-stone-400 hover:text-stone-200"
+          >
+            Reset
+          </button>
         </div>
       </main>
     </div>
